@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 
 
-R = "root"
+ROOT = "root"
 
 
 class NodeNum(ABC):
@@ -180,14 +180,14 @@ class NodeContacts:
     Class for node's representation in nodes dictionary.
     """
     def __init__(self,
-                 parent: QubitNum | R = 0,
+                 parent: QubitNum | ROOT = 0,
                  childs: list[QubitNum | BranchNum | LostNum] = None
                  ):
         """
         self.parent = int | QubitNum -- number of parent node
         self.childs = list(QubitNum | BranchNum |LostNum)
         """
-        if parent == R:
+        if parent == ROOT:
             self.parent = parent
         else:
             self.parent = QubitNum(parent)

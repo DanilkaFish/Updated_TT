@@ -152,30 +152,6 @@ class BaseTernaryTree:
         if set(bnum) != set(list(range(1, len(bnum) + 1))):
             raise TreeStructureError("Numeration of the branches should be from 1 to " + str(len(bnum)) + " without repetitions")
 
-    # def check_qubits_structure(self):
-    #     """
-    #         Small check of nodes object.
-    #     """
-    #
-    #     # check = {}
-    #     # edges = {}
-    #
-    #     def _check_qubits_structure(child, **kwargs):
-    #         nodes = kwargs["nodes"]
-    #         parent = kwargs["parent"]
-    #
-    #         if isinstance(child, QubitNum):
-    #             if not self.is_root(child):
-    #                 return nodes[child].parent == parent
-    #
-    #     s = self.recursive_traversal(_check_qubits_structure)
-    #     for obj in s:
-    #         if isinstance(obj, bool):
-    #             if not obj:
-    #                 raise ValueError("Some of the child's parent and parent's child differ")
-    #     s = [key for key in self.nodes]
-    #     if len(set(s)) != len(s):
-    #         raise ValueError("Numeration of the qubits should differ")
 
     def add_node(self, node, its_parent, pos = 0):
 
@@ -340,27 +316,3 @@ class BaseTernaryTree:
 
         return pr + '\n ---------------------------------------------------------------'
 
-    # def recursive_traversal(self, fun, init=None, **kwargs):
-    #     if init is None:
-    #         init = self.root
-    #     s_ = []
-    #     if 'nodes' in kwargs:
-    #         nodes = kwargs["nodes"]
-    #     else:
-    #         nodes = self._nodes
-    #
-    #     def down(
-    #             s: list[int],
-    #             parent: QubitNum
-    #     ):
-    #         for i, child in enumerate(nodes[parent]):
-    #             s.append(fun(child, parent=parent, i=i, nodes=nodes, **kwargs))
-    #             if not child.is_last:
-    #                 down(s, child)
-    #     try:
-    #         down(s_, QubitNum(init))
-    #     except KeyError:
-    #         raise KeyError("nodes dictionary should content all the child nodes and root node")
-    #     except Exception as e:
-    #         raise e
-    #     return s_

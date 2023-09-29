@@ -113,12 +113,6 @@ def draw(tt: TernaryTree, k = 1):
                 got_net.add_edge(str(node), str(xy[node][1]))
         else:
             got_net.add_edge(str(node), str(xy[node][1]))
-    # neighbor_map = got_net.get_adj_list()
-
-    # add neighbor data to node hover data
-    # for node in got_net.nodes:
-        # node["title"] += " Neighbors:<br>" + "<br>".join(neighbor_map[node["id"]])
-        # node["value"] = len(neighbor_map[node["id"]])
 
     got_net.show("tree.html", notebook = False)
 

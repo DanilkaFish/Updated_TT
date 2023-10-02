@@ -4,7 +4,7 @@ import unittest
 # from TernaryTree import TernaryTree, pauli_weight, prod_pauli_strings
 from __init__ import *
 
-from TreeVizualization import draw
+# from TreeVizualization import draw
 
 
 def bonsai():
@@ -124,21 +124,17 @@ class TestTernaryTree(unittest.TestCase):
         tt.build_full_tt(0)
         tt.build_full_tt(4)
         tt.build_bk_tree(10)
-        print(tt.nodes)
-        draw(tt)
         tt.build_bk_tree(0)
         tt.build_bk_tree(4)
         tt.build_alphabeta_tree(4)
         tt.build_alphabeta_tree(8)
         tt.build_alphabeta_tree(14)
-        draw(tt)
         tt = TernaryTree(10)
         tt.delete_node(5)
 
         tt.add_node(5, 4, 0)
         tt.delete_node([5,6,7,8,9])
         tt.update_branchnum()
-        draw(tt)
         tt.update_branchnum(enum_list = range(1, 2*tt.num_nodes + 2))
         self.assertRaises(TreeStructureError, lambda: tt.update_branchnum(enum_list = range(1, 2)))
         tt.change_num(4, 2)

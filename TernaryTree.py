@@ -12,7 +12,8 @@ class TernaryTree(BaseTernaryTree):
     """
     Ternary tree object for initial state preparation
     """
-        
+
+
     def branch_transposition(
             self,
             node1: QubitNum | int,

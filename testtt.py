@@ -39,98 +39,6 @@ def bonsai():
     return tt
 
 
-def st_enumeration1(nmodes: int = 36):
-    """
-    Standard numeration for alpha_beta_tree which is effective on my opinion
-    """
-    num_list = []
-    j = 0
-    if nmodes % 2 == 0 and nmodes > 2:
-        for i in range(1, nmodes - 1):
-            if j <= 1:
-                j += 1
-                num_list = num_list + [i, i + 2]
-            else:
-                if j == 2:
-                    j = 3
-                else:
-                    j = 0
-        if nmodes //2 % 2 != 0:
-            num_list = num_list + [nmodes -1, nmodes]
-        for i in range(1, nmodes - 1):
-            if j <= 1:
-                j += 1
-                num_list = num_list + [ i + nmodes, i + 2 + nmodes]
-            else:
-                if j == 2:
-                    j = 3
-                else:
-                    j = 0
-        if nmodes //2 % 2 != 0:
-            num_list = num_list + [nmodes*2 - 1, 2*nmodes ]
-    return num_list
-
-
-def st_enumeration2(nmodes: int = 36):
-    """
-    Standard numeration for alpha_beta_tree which is effective on my opinion
-    """
-    num_list = []
-
-    if nmodes % 2 == 0 and nmodes > 2:
-        j = 1
-        for i in range(1, 18):
-            num_list = num_list + [i*j + (nmodes - i + 1) * (1-j)]
-            j = (j + 1) % 2
-        j = 1
-        for i in range(1, 19):
-            num_list = num_list + [(i + 1)*j + (nmodes - i + 2) * (1-j)]
-            j = (j + 1) % 2
-        j = 1
-        for i in range(37, 55):
-            num_list = num_list + [i * j + (3*nmodes - i + 1) * (1 - j)]
-            j = (j + 1) % 2
-        j = 1
-        for i in range(37, 55):
-            num_list = num_list + [(i + 1) * j + (3*nmodes - i + 2) * (1 - j)]
-            j = (j + 1) % 2
-
-    return num_list
-
-
-def st_enumeration3(nmodes: int = 30):
-    """
-    Standard numeration for alpha_beta_tree which is effective on my opinion
-    """
-    # nmodes = 36
-    k = nmodes // 4 + 1
-    j = nmodes // 2 % 2
-    num_list = []
-
-    if nmodes % 2 == 0 and nmodes > 2:
-        for i in range(1, k):
-            num_list = num_list + [2 * i - 1] + [nmodes - 2 * i + 1]
-        if j == 1:
-            num_list = num_list + [nmodes//2]
-
-        for i in range(1, k):
-            num_list = num_list + [2 * i ] + [nmodes - 2 * i + 2]
-        if j == 1:
-            num_list = num_list + [nmodes//2 + 1]
-
-        for i in range(1, k):
-            num_list = num_list + [nmodes + 2 * i - 1] + [2*nmodes - 2 * i + 1]
-        if j == 1:
-            num_list = num_list + [nmodes//2 + nmodes]
-
-        for i in range(1, k):
-            num_list = num_list + [nmodes + 2 * i] + [2*nmodes - 2 * i + 2]
-        if j == 1:
-            num_list = num_list + [nmodes//2 + nmodes + 1]
-
-    return num_list
-
-
 class TestNode(unittest.TestCase):
     def setUp(self):
         self.q = QubitNum(1)
@@ -215,6 +123,15 @@ class TestTernaryTree(unittest.TestCase):
         tt.build_full_tt(10)
         tt.build_full_tt(0)
         tt.build_full_tt(4)
+        tt.build_bk_tree(10)
+        print(tt.nodes)
+        draw(tt)
+        tt.build_bk_tree(0)
+        tt.build_bk_tree(4)
+        tt.build_alphabeta_tree(4)
+        tt.build_alphabeta_tree(8)
+        tt.build_alphabeta_tree(14)
+        draw(tt)
         tt = TernaryTree(10)
         tt.delete_node(5)
 

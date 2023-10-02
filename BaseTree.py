@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 
 from Nodes import BranchNum, QubitNum, LostNum, NodeContacts, ROOT
-
+from bk import transform_majorana_operator, bk_majorana_operators
 
 gate_name_to_number = {'X': 0, 'Y': 1, 'Z': 2}
 gate_number_to_name = {0: 'X', 1: 'Y', 2: 'Z'}
@@ -52,7 +52,7 @@ class BaseTernaryTree:
         if nodes is not None:
             self.nodes = nodes
         else:
-            self.build_st_tree(n_qubits)
+            self.build_jw_tree(n_qubits)
 
     @property
     def nodes(self):
@@ -118,17 +118,17 @@ class BaseTernaryTree:
             level = 0
             qubits = list(range(0, n_qubits))
             while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
-                t = t + [(qubits[(3 ** level - 1) // 2:3 ** level + (3 ** level - 1) // 2])]
+                t = t + [tuple(qubits[(3 ** level - 1) // 2:3 ** level + (3 ** level - 1) // 2])]
                 level += 1
 
-            t = t + [(qubits[(3 ** level - 1) // 2:n_qubits])]
+            t = t + [tuple(qubits[(3 ** level - 1) // 2:n_qubits])]
             self.nodes = t
             self.update_branchnum()
             self[QubitNum(n_qubits - 1)][2] = LostNum()
         else:
             self._nodes = {}
 
-    def build_st_tree(self, n_qubits):
+    def build_jw_tree(self, n_qubits):
         if n_qubits > 0:
             self.root = QubitNum(0)
             self._nodes[self.root] = NodeContacts(parent=ROOT,
@@ -143,6 +143,94 @@ class BaseTernaryTree:
         else:
             self._nodes = {}
 
+    def build_bk_tree(self, n_qubits):
+        # TODO
+        def down(_branches,node,edge = None):
+            nonlocal pos
+
+            if len(_branches) <= 1:
+                if len(_branches) == 1:
+                    self[node][edge] = BranchNum(pos)
+                    pos += 1
+            else:
+                qubits_set = {sigma[0] for sigma in _branches[0]}
+                for branch in _branches[1:]:
+                    qubits_set = qubits_set.intersection({sigma[0] for sigma in branch})
+
+                new_node = QubitNum(list(qubits_set)[0])
+
+                self[new_node] = NodeContacts(node)
+                if node == ROOT:
+                    self.root = new_node
+                else:
+                    self[node][edge] = new_node
+                for i in range(3):
+                    new_branches = []
+                    for branch in _branches:
+                        _branch = []
+                        flag = False
+                        for sigma in branch:
+                            if sigma == (new_node.num, gate_number_to_name[i]):
+                                flag = True
+                            else:
+                                _branch = _branch + [sigma]
+                        if flag:
+                            new_branches = new_branches + [_branch]
+                    down(new_branches, new_node, i)
+
+        self._nodes = {}
+
+        if n_qubits > 0:
+            branches = bk_majorana_operators(n_qubits)
+            pos = 1
+            self._nodes = {}
+            down(branches, ROOT)
+        self.check_branch_numeration()
+
+    def build_alphabeta_tree(self, nmodes):
+        if nmodes > 0:
+
+            t = [(0,)]
+            if nmodes % 2 == 0:
+                n_qubits = nmodes // 2
+                t1 = []
+                level = 0
+                qubits = list(range(1, n_qubits + 1))
+                while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
+                    t1 = t1 + [tuple(qubits[(3 ** level - 1) // 2:3 ** level + (3 ** level - 1) // 2])]
+                    level += 1
+
+                t1 = t1 + [tuple(qubits[(3 ** level - 1) // 2:n_qubits] + [None]*(3 ** level + (3 ** level - 1) // 2 - n_qubits))]
+
+                t2 = []
+                level = 0
+                qubits = list(range(n_qubits + 1, 2*n_qubits + 1))
+
+                while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
+                    t2 = t2 + [tuple(qubits[(3 ** level - 1) // 2: 3 ** level + (3 ** level - 1) // 2])]
+                    level += 1
+
+                t2 = t2 + [tuple(qubits[(3 ** level - 1) // 2:n_qubits])]
+                t = t + [t1[0] + (None,) + t2[0]]
+                for i in range(1, len(t1)):
+                    t = t + [t1[i] + t2[i]]
+
+                self.nodes = t
+                self.delete_node(n_qubits)
+                self.update_branchnum()
+                node = self.root
+                while not self[node][2].is_last:
+                    node = self[node][2]
+                self[node][2] = LostNum()
+                # self[n_qubits][2] = LostNum()
+                # self[2*n_qubits][2] = LostNum()
+                self.update_branchnum(renumerate=False)
+                self.check_branch_numeration()
+            else:
+                raise TreeStructureError("There is should be even number of modes")
+        else:
+            self._nodes = {}
+
     def check_branch_numeration(self):
         bnum = []
         for node in self:
@@ -150,8 +238,8 @@ class BaseTernaryTree:
                 if isinstance(child, BranchNum):
                     bnum.append(child.num)
         if set(bnum) != set(list(range(1, len(bnum) + 1))):
-            raise TreeStructureError("Numeration of the branches should be from 1 to " + str(len(bnum)) + " without repetitions")
-
+            raise TreeStructureError("Numeration of the branches should be from 1 to "
+                                     + str(len(bnum)) + " without repetitions")
 
     def add_node(self, node, its_parent, pos = 0):
 
@@ -231,11 +319,17 @@ class BaseTernaryTree:
                     for i, child in enumerate(self[node]):
                         if isinstance(child, BranchNum):
                             self[node][i] = LostNum()
-            for node in self:
-                for i, child in enumerate(self[node]):
-                    if isinstance(child, LostNum):
-                        self[node][i] = BranchNum(pos)
-                        pos += 1
+                for node in self:
+                    for i, child in enumerate(self[node]):
+                        if isinstance(child, LostNum):
+                            self[node][i] = BranchNum(pos)
+                            pos += 1
+            else:
+                for node in self:
+                    for i, child in enumerate(self[node]):
+                        if isinstance(child, BranchNum):
+                            self[node][i] = BranchNum(pos)
+                            pos += 1
         else:
             pos = 0
             try:
@@ -304,6 +398,7 @@ class BaseTernaryTree:
                 pr = pr + '\n'
             for num in enum_list:
                 pr += str(num) + ' ' * (k - len(str(num)))
+
         else:
             for l in range(0, L - 1):
                 for branch in s:

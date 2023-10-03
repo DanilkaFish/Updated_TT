@@ -91,6 +91,8 @@ class QubitNum(NodeNum):
     @num.setter
     def num(self, value):
         value = self._get_num(value)
+        if value is None:
+            raise ValueError("type value shold be int or NodeNum not " + str(type(value)))
         if value >= 0:
             self._num = value
         else:
@@ -161,11 +163,11 @@ class LostNum(NodeNum):
 
     @staticmethod
     def _get_num(other):
-        raise Exception("Attempt to use numeration for LostNum class")
-
+        # raise Exception("Attempt to use numeration for LostNum class")
+        return None
     @property
     def name(self):
-        return "b"
+        return "l"
 
     @property
     def is_last(self):
@@ -200,6 +202,9 @@ class NodeContacts:
     @property
     def childs(self):
         return self._childs
+
+    def child_index(self, child):
+        return self.childs.index(child)
 
     @staticmethod
     def obj_to_child(value):

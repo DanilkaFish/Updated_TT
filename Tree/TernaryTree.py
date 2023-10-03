@@ -1,5 +1,5 @@
-from BaseTree import BaseTernaryTree,TreeStructureError
-from Nodes import QubitNum, BranchNum, LostNum
+from Tree.BaseTree import BaseTernaryTree, TreeStructureError
+from Tree.Nodes import QubitNum, BranchNum, LostNum
 
 gate_name = {0: 'X', 1: 'Y', 2: 'Z'}
 gate_index = {'X': 0, 'Y': 1, 'Z': 2}
@@ -13,6 +13,26 @@ class TernaryTree(BaseTernaryTree):
     Ternary tree object for initial state preparation
     """
 
+    def get_majorana(self,maj_num):
+        maj = []
+        base = None
+        for node in self.nodes:
+            for i,child in enumerate(self[node]):
+                if child == BranchNum(maj_num):
+                    base = node
+                    index = i
+                    break
+
+        if base is None:
+            raise ValueError("Tree doesn't have gamma_" + str(maj_num))
+
+        while not self.is_root(base):
+            maj = maj + [(base, index)]
+            child = base
+            base = self.parent(base)
+            index = self[base].child_index(child)
+        maj = maj + [(base, index)]
+        return maj
 
     def branch_transposition(
             self,

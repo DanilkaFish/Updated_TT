@@ -129,6 +129,9 @@ class TestTernaryTree(unittest.TestCase):
         tt.build_alphabeta_tree(4)
         tt.build_alphabeta_tree(8)
         tt.build_alphabeta_tree(14)
+        # print(tt.get_majorana(7))
+        # print(tt.get_majorana(28))
+        self.assertRaises(ValueError, lambda: tt.get_majorana(0))
         tt = TernaryTree(10)
         tt.delete_node(5)
 

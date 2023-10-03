@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-from BaseTree import NodeContacts, QubitNum, BranchNum
-from TernaryTree import TernaryTree
+from Tree.BaseTree import NodeContacts, QubitNum, BranchNum
+from Tree.TernaryTree import TernaryTree
 
 from pyvis.network import Network
 

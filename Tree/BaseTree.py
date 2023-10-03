@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import warnings
 
-from Nodes import BranchNum, QubitNum, LostNum, NodeContacts, ROOT
-from bk import transform_majorana_operator, bk_majorana_operators
+from Tree.Nodes import BranchNum, QubitNum, LostNum, NodeContacts, ROOT
+from Tree.bk import bk_majorana_operators
 
 gate_name_to_number = {'X': 0, 'Y': 1, 'Z': 2}
 gate_number_to_name = {0: 'X', 1: 'Y', 2: 'Z'}
@@ -363,9 +363,6 @@ class BaseTernaryTree:
         down(self.root, k=[], branches=s)
         return s
 
-    #TODO
-    def draw(self):
-        pass
 
     def __str__(self, until_enum=False):
         k = []

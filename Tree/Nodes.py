@@ -119,6 +119,9 @@ class BranchNum(NodeNum):
     """
         Type for numeration of the branches. This is special type for tree leaves.
     """
+    def __init__(self, num: int = 1):
+        super().__init__(num)
+        self.sign = +1
 
     @property
     def num(self):

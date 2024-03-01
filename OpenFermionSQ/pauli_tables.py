@@ -1,58 +1,66 @@
 import numpy as np
 from qiskit.quantum_info.operators import Pauli
-from .BaseTree import st_enumeration
-from .TernaryTree import TernaryTree
+import sys
 
 
+from ..Tree.TernaryTree import TernaryTree
 
-def _pauli_table_TT(**kwargs):
+
+def _pauli_table_TT(tt: TernaryTree):
     """
     This function is used by InitstateTTInfo for vacuum preparation.
     """
-    tt =  kwargs.get("tt", None)
-    if tt == None:
-        tt = TernaryTree(nmodes)
+
 
     n_qubits = tt.n_qubits
-    nmodes = tt.nmodes
     branches = tt.branches()
-    num_list = tt.enum_list
-    print(num_list)
-    def branch_to_str(branch):
-        pauli_list = ["I"]*n_qubits
-        pauli_str = ""
-        for el in branch:
-            pauli_list[el[0]] = el[1]
-        for pauli in pauli_list:
-            pauli_str += pauli
-        return pauli_str
+
+    def majorana_to_str(num):
+        pauli_list = ["I"] * n_qubits
+        maj, sign = tt.get_majorana(num + 1)
+        for el in maj:
+            pauli_list[el] = maj[el]
+        return ''.join(pauli_list), sign
+
     pauli_table_str = []
-    for i in range(nmodes):
-        pauli_table_str.append( (branch_to_str(branches[num_list.index(2*i )]) ,  branch_to_str(branches[num_list.index(2*i + 1)]) ))
-    return [pauli_table_str,[[1,-1j] for _ in range(len(pauli_table_str))]]
+    coef = []
+    for i in range(n_qubits):
+        str1, sign1 = majorana_to_str(2 * i)
+        str2, sign2 = majorana_to_str(2 * i + 1)
+        pauli_table_str.append(
+            (str1, str2))
+        coef.append([0.5 * sign1, 0.5j * sign2])
+    print(tt)
+    for i in range(len(coef)):
+        print("str = ", pauli_table_str[i],"; coef = ", coef[i])
+    
+    return pauli_table_str, coef
+
 
 def pauli_table_TT(**kwargs):
     """
     This function is used by TernaryTreeMapper to obtain pauli_table
     """
     pauli_table = []
-    pauli_table_str = _pauli_table_TT(**kwargs)[0]
+    pauli_table_str, coefs = _pauli_table_TT(**kwargs)
     for i in range(len(pauli_table_str)):
-        pauli_table.append( (Pauli( pauli_table_str[i][0] ), Pauli( pauli_table_str[i][1])) )
+        pauli_table.append(((Pauli(pauli_table_str[i][0]), Pauli(pauli_table_str[i][1])), coefs[i]))
+    
     return pauli_table
 
-def _pauli_table_JW(nmodes, num_list = None):
-    
+
+def _pauli_table_JW(nmodes, num_list=None):
     pt = []
     for i in range(nmodes):
         a_z = np.asarray([1] * i + [0] + [0] * (nmodes - i - 1), dtype=bool)
         a_x = np.asarray([0] * i + [1] + [0] * (nmodes - i - 1), dtype=bool)
         b_z = np.asarray([1] * i + [1] + [0] * (nmodes - i - 1), dtype=bool)
         b_x = np.asarray([0] * i + [1] + [0] * (nmodes - i - 1), dtype=bool)
-        pt.append(["Z" * i + "X" + "I"*(nmodes - i - 1), "Z" * i + "Y" + "I"*(nmodes - i - 1)])
-    return [pt,[1,-1j]*len(pt)]
+        pt.append(["Z" * i + "X" + "I" * (nmodes - i - 1), "Z" * i + "Y" + "I" * (nmodes - i - 1)])
+    return [pt, [1, -1j] * len(pt)]
 
-def pauli_table_JW(nmodes,**kwargs):
+
+def pauli_table_JW(nmodes, **kwargs):
     pauli_table = []
     for i in range(nmodes):
         a_z = np.asarray([1] * i + [0] + [0] * (nmodes - i - 1), dtype=bool)
@@ -67,8 +75,8 @@ def pauli_table_JW(nmodes,**kwargs):
 
 
 def pauli_table_BK(nmodes, **kwargs):
-
     pauli_table = []
+
     def parity_set(j, n):
         """
         Computes the parity set of the j-th orbital in n modes.

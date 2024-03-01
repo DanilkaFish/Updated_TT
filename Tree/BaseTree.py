@@ -2,92 +2,94 @@ from __future__ import annotations
 
 import warnings
 
-from Tree.Nodes import BranchNum, QubitNum, LostNum, NodeContacts, ROOT
-from Tree.bk import bk_majorana_operators
+from .Nodes import BranchNum, QubitNum, LostNum, NodeContacts, ROOT
+from .tree_builder import _build_alphabeta_tree, _build_full_tt, _build_jw_tree, _build_bk_tree
+from .TreeErrors import TreeStructureError
 
 gate_name_to_number = {'X': 0, 'Y': 1, 'Z': 2}
 gate_number_to_name = {0: 'X', 1: 'Y', 2: 'Z'}
+
 dict_prod = {"II": "I", "XX": "I", "YY": "I", "ZZ": "I",
              "XY": 'Z', "YX": 'Z', "XZ": 'Y', "ZX": 'Y', "YZ": 'X', "ZY": 'X',
              "IX": "X", "XI": "X", "YI": "Y", "IY": "Y", "IZ": "Z", "ZI": "Z"}
 
 
-class TreeStructureError(Exception):
-    def __init__(self, text):
-        self.txt = text
-
-
-def st_enumeration(nmodes):
-    """
-    Standard numeration for alpha_beta_tree which is effective on my opinion
-    """
-    num_list = []
-    if nmodes % 2 == 0 and nmodes > 2:
-        for i in range(nmodes//2):
-            num_list.append([i, nmodes - i - 1])
-        for i in range(nmodes + nmodes - 1, nmodes + nmodes//2 - 1, -1):
-            num_list.append([i, - i + nmodes*3 - 1])
-    else:
-        num_list = [[2*i, 2*i + 1] for i in range(nmodes)]
-    return num_list
-
-
 class BaseTernaryTree:
     """ This is the class for representation ternary tree and its manipulations"""
+
     def __init__(
             self,
             n_qubits: int = 0,
-            nodes: list[tuple[int]] = None,
-            root: QubitNum | int = QubitNum(0)
+            nodes: [[int]] = None,
     ):
         """
-        self.n_qubits = int -- number of qubits or number of tree nodes
-        self.nodes = {parent_number : NodeContacts} -- tree's structure
-        self.num_particles = tuple(int,int) -- number alpha and beta electrons respectively (Need only for branches' numeration)
-        self.nmodes = int number -- number fermionic modes (Need only for branches' numeration)
-        self.enum_list = [int] -- branches numeration
+        Arg:
+            n_qubits: number of qubits (number of tree nodes)
+            nodes: tree's structure.
+            Example:
+                [[1], -- first level (root node)
+                [2,3,4], -- second level
+                [5,_,_,6,_,_,7,8,9]] -- third level
+                       1
+                     / | \
+                    2  3  4
+                   /  /  /|\
+                  5  6  7 8 9
+        Fields:
+            self.root: QubitNum -- root of the tree
+            self.nodes: {QubitNum : NodeContacts} -- dict of the tree's nodes
         """
-        self.root = QubitNum(root)
+        self.root = None
         self._nodes = {}
         if nodes is not None:
             self.nodes = nodes
         else:
             self.build_jw_tree(n_qubits)
 
+    def build_full_tt(self, n_qubits):
+        _build_full_tt(self, n_qubits)
+
+    def build_jw_tree(self, n_qubits):
+        _build_jw_tree(self, n_qubits)
+
+    def build_bk_tree(self, n_qubits):
+        _build_bk_tree(self, n_qubits)
+
+    def build_alphabeta_tree(self, nmodes):
+        _build_alphabeta_tree(self, nmodes)
+
     @property
     def nodes(self):
         return self._nodes
 
-    def parent(self, node: QubitNum | int):
-        return self[node].parent
-
-    def change_num(self, node: int | QubitNum, edge: int, num: int | BranchNum = None):
-        node = QubitNum(node)
-
-        if num is None:
-            num = LostNum()
-        else:
-            num = BranchNum(num)
-        try:
-            self[node][edge] = num
-        except KeyError:
-            warnings.warn("Here is no node ", node)
-        try:
-            self.check_branch_numeration()
-        except TreeStructureError:
-            self.update_branchnum(renumerate=False)
-
-    def is_root(self, node: QubitNum | int):
-        if self[node].parent == ROOT:
-            return True
-        else:
-            return False
+    @nodes.setter
+    def nodes(self, nodes: [[int]]):
+        self._nodes = {}
+        last_level = [None]
+        max_nodes = 1
+        for index, level in enumerate(nodes):
+            minim = min(len(level), max_nodes)
+            number_nodes = 0
+            for i in range(minim):
+                if isinstance(level[i], int):
+                    number_nodes += 1
+                    self.add_node(node=level[i],
+                                  its_parent=last_level[i // 3],
+                                  pos=i % 3)
+            last_level = [i for i in level if not (i is None)]
+            max_nodes = number_nodes * 3
 
     @property
-    def num_nodes(self):
+    def n_qubits(self) -> int:
         return len(self.nodes)
 
-    def height(self):
+    def parent(self, node: QubitNum | int) -> QubitNum:
+        return self[node].parent
+
+    def is_root(self, node: QubitNum | int) -> bool:
+        return (self[node].parent == ROOT)
+
+    def height(self) -> int:
         """
         Return tree's height
         """
@@ -95,159 +97,29 @@ class BaseTernaryTree:
         height = max([len(branch[1]) for branch in branches])
         return height
 
-    @nodes.setter
-    def nodes(self, nodes):
-        self._nodes = {}
-        last_level = [None]
-        max_level_nodes = 1
-        for index, level in enumerate(nodes):
-            minim = min(len(level), max_level_nodes)
-            number_level_nodes = 0
-            for i in range(minim):
-                if isinstance(level[i], int):
-                    number_level_nodes += 1
-                    self.add_node(node=level[i], its_parent=last_level[i//3], pos=i % 3)
+    def parent_contacts(self, node) -> NodeContacts:
+        return self[self[node].parent]
 
-            last_level = [i for i in level if not (i is None)]
-            max_level_nodes = number_level_nodes*3
+    def parent_to_node_edge(self, node) -> int:
+        return self.parent_contacts(node).childs.index(node)
 
-    def build_full_tt(self, n_qubits):
-        if n_qubits > 0:
-            self.root = QubitNum(0)
-            t = []
-            level = 0
-            qubits = list(range(0, n_qubits))
-            while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
-                t = t + [tuple(qubits[(3 ** level - 1) // 2:3 ** level + (3 ** level - 1) // 2])]
-                level += 1
-
-            t = t + [tuple(qubits[(3 ** level - 1) // 2:n_qubits])]
-            self.nodes = t
-            self.update_branchnum()
-            self[QubitNum(n_qubits - 1)][2] = LostNum()
+    def __getitem__(self, key: QubitNum | int) -> NodeContacts:
+        if QubitNum(key) in self.nodes:
+            return self.nodes[QubitNum(key)]
         else:
-            self._nodes = {}
+            raise TreeStructureError("Ref to non existing node")
 
-    def build_jw_tree(self, n_qubits):
-        if n_qubits > 0:
-            self.root = QubitNum(0)
-            self._nodes[self.root] = NodeContacts(parent=ROOT,
-                                                  childs=[BranchNum(1), BranchNum(2), 1])
-            for i in range(1, n_qubits):
-                self.nodes[QubitNum(i)] = NodeContacts(parent=i-1,
-                                                       childs=[BranchNum(2*i+1), BranchNum(2*i+2), i+1])
-            self._nodes[QubitNum(n_qubits - 1)][2] = LostNum()
-            self.update_branchnum()
-            self[QubitNum(n_qubits - 1)][2] = LostNum()
-            self.check_branch_numeration()
-        else:
-            self._nodes = {}
+    def __setitem__(self, key: QubitNum | int, val: NodeContacts):
+        self.nodes[QubitNum(key)] = val
+        return val
 
-    def build_bk_tree(self, n_qubits):
-        # TODO
-        def down(_branches,node,edge = None):
-            nonlocal pos
+    def __iter__(self):
+        return self.nodes.__iter__()
 
-            if len(_branches) <= 1:
-                if len(_branches) == 1:
-                    self[node][edge] = BranchNum(pos)
-                    pos += 1
-            else:
-                qubits_set = {sigma[0] for sigma in _branches[0]}
-                for branch in _branches[1:]:
-                    qubits_set = qubits_set.intersection({sigma[0] for sigma in branch})
-
-                new_node = QubitNum(list(qubits_set)[0])
-
-                self[new_node] = NodeContacts(node)
-                if node == ROOT:
-                    self.root = new_node
-                else:
-                    self[node][edge] = new_node
-                for i in range(3):
-                    new_branches = []
-                    for branch in _branches:
-                        _branch = []
-                        flag = False
-                        for sigma in branch:
-                            if sigma == (new_node.num, gate_number_to_name[i]):
-                                flag = True
-                            else:
-                                _branch = _branch + [sigma]
-                        if flag:
-                            new_branches = new_branches + [_branch]
-                    down(new_branches, new_node, i)
-
-        self._nodes = {}
-
-        if n_qubits > 0:
-            branches = bk_majorana_operators(n_qubits)
-            pos = 1
-            self._nodes = {}
-            down(branches, ROOT)
-        self.check_branch_numeration()
-
-    def build_alphabeta_tree(self, nmodes):
-        if nmodes > 0:
-
-            t = [(0,)]
-            if nmodes % 2 == 0:
-                n_qubits = nmodes // 2
-                t1 = []
-                level = 0
-                qubits = list(range(1, n_qubits + 1))
-                while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
-                    t1 = t1 + [tuple(qubits[(3 ** level - 1) // 2:3 ** level + (3 ** level - 1) // 2])]
-                    level += 1
-
-                t1 = t1 + [tuple(qubits[(3 ** level - 1) // 2:n_qubits] + [None]*(3 ** level + (3 ** level - 1) // 2 - n_qubits))]
-
-                t2 = []
-                level = 0
-                qubits = list(range(n_qubits + 1, 2*n_qubits + 1))
-
-                while 3 ** level + (3 ** level - 1) // 2 < n_qubits:
-                    t2 = t2 + [tuple(qubits[(3 ** level - 1) // 2: 3 ** level + (3 ** level - 1) // 2])]
-                    level += 1
-
-                t2 = t2 + [tuple(qubits[(3 ** level - 1) // 2:n_qubits])]
-                t = t + [t1[0] + (None,) + t2[0]]
-                for i in range(1, len(t1)):
-                    t = t + [t1[i] + t2[i]]
-
-                self.nodes = t
-                self.delete_node(n_qubits)
-                self.update_branchnum()
-                node = self.root
-                while not self[node][2].is_last:
-                    node = self[node][2]
-                self[node][2] = LostNum()
-                # self[n_qubits][2] = LostNum()
-                # self[2*n_qubits][2] = LostNum()
-                self.update_branchnum(renumerate=False)
-                self.check_branch_numeration()
-            else:
-                raise TreeStructureError("There is should be even number of modes")
-        else:
-            self._nodes = {}
-
-    def check_branch_numeration(self):
-        bnum = []
-        for node in self:
-            for i, child in enumerate(self[node]):
-                if isinstance(child, BranchNum):
-                    bnum.append(child.num)
-        if set(bnum) != set(list(range(1, len(bnum) + 1))):
-            raise TreeStructureError("Numeration of the branches should be from 1 to "
-                                     + str(len(bnum)) + " without repetitions")
-
-    def add_node(self, node, its_parent, pos = 0):
-
-        if len(self.nodes) == 0:
-
-            node = QubitNum(node)
-            self.root = node
-            self[node] = NodeContacts(ROOT)
+    def add_node(self, node, its_parent, pos=0):
+        if self.n_qubits == 0:
+            self.root = QubitNum(node)
+            self[self.root] = NodeContacts(ROOT)
         else:
             node = QubitNum(node)
             its_parent = QubitNum(its_parent)
@@ -260,9 +132,9 @@ class BaseTernaryTree:
                                    " already has child on " + str(pos))
             else:
                 raise KeyError("Self.nodes already has node " + str(node) +
-                               " or hasn't its_parent " + str(its_parent))
+                               " or haven't its_parent " + str(its_parent))
 
-    def delete_node(self, nodes: list[int | QubitNum] | int | QubitNum = None):
+    def delete_node(self, nodes: [Union[int | QubitNum]] | int | QubitNum = None):
         """
         Remove nodes and its childs from parent child
         """
@@ -272,139 +144,128 @@ class BaseTernaryTree:
             for node in nodes:
                 self._delete_node(node)
 
+    def down_generator(self,
+                       node: QubitNum | int = None,
+                       do_after: callable = lambda *args, **kwargs: None,
+                       **kwargs):
+        """
+        Generator to pass the tree with the branhces.
+        node: Node to start come through
+        do_after: action to do after recursive exit
+        """
+        if node is None:
+            node = self.root
+        if not node.is_last:
+            for index, child in enumerate(self[node]):
+                yield index, child, node
+                yield from self.down_generator(child,
+                                               do_after=do_after,
+                                               **kwargs)
+        do_after(node, **kwargs)
+
     def _delete_node(self, node: int | QubitNum = 0):
         """
         Remove node and its childs from nodes
         """
-        if not isinstance(node, (QubitNum, int)):
-            raise TypeError("Node should be integer or QubitNum")
-
-        def down(
-                node_: QubitNum
-        ):
-            for child_ in self[node_].childs:
-                if not child_.is_last:
-                    down(child_)
-            self.nodes.pop(node_)
-
         node = QubitNum(node)
+
+        def do_after(_node, **kwargs):
+            if _node in self.nodes:
+                self._nodes.pop(_node)
+
         if node in self.nodes:
             if self[node].parent == ROOT:
                 self._nodes = {}
             else:
-                for i, child in enumerate(self[self[node].parent]):
-                    if node == child:
-                        self.parent_contacts(node)[i] = LostNum()
-            down(node)
+                index = self.parent_to_node_edge(node)
+                self.parent_contacts(node)[index] = LostNum()
+                for obj in self.down_generator(node, do_after=do_after):
+                    pass
 
-    def parent_contacts(self, node):
-        return self[self[node].parent]
-
-    def update_branchnum(self, enum_list: list = None, renumerate = True):
-        pos = 0
-
-        def down(node):
-            nonlocal pos, enum_list
-            for i, child in enumerate(self[node]):
-                if isinstance(child, BranchNum):
-                    self[node][i] = BranchNum(enum_list[pos])
-                    pos += 1
-                elif not child.is_last:
-                    down(child)
+    def update_branchnum(self, enum_list: list = None, renumerate=False):
+        if renumerate:
+            num = 1
+            for parent in self.nodes:
+                for i, child in enumerate(self[parent]):
+                    if child.is_last:
+                        self[parent][i] = BranchNum(num)
+                        num += 1
+            return True
 
         if enum_list is None:
-            pos = 1
-            if renumerate:
-                for node in self:
-                    for i, child in enumerate(self[node]):
-                        if isinstance(child, BranchNum):
-                            self[node][i] = LostNum()
-                for node in self:
-                    for i, child in enumerate(self[node]):
-                        if isinstance(child, LostNum):
-                            self[node][i] = BranchNum(pos)
-                            pos += 1
-            else:
-                for node in self:
-                    for i, child in enumerate(self[node]):
-                        if isinstance(child, BranchNum):
-                            self[node][i] = BranchNum(pos)
-                            pos += 1
-        else:
-            pos = 0
-            try:
-                down(self.root)
-            except IndexError:
-                raise TreeStructureError("Numeration should be from 1 to " + str(len(self.branches())))
-            self.check_branch_numeration()
+            enum_list = range(1, self.n_qubits * 2 + 1)
 
-    def __getitem__(self, key):
-        return self.nodes[QubitNum(key)]
+        pos = 0
+        try:
+            for i, child, parent in self.down_generator(self.root):
+                if isinstance(child, BranchNum):
+                    self[parent][i] = BranchNum(enum_list[pos])
+                    pos += 1
+        except IndexError:
+            raise TreeStructureError("Numeration should be from 1 to " + str(len(self.branches())))
 
-    def __setitem__(self, key, val):
-        self.nodes[QubitNum(key)] = val
-        return val
+        self.check_branch_numeration()
 
-    def __iter__(self):
-        return self.nodes.__iter__()
+    def check_branch_numeration(self):
+        bnum = []
+        for node in self:
+            for i, child in enumerate(self[node]):
+                if isinstance(child, BranchNum):
+                    bnum.append(child.num)
+        if set(bnum) != set(list(range(1, len(bnum) + 1))):
+            raise TreeStructureError("Numeration of the branches should be from 1 to "
+                                     + str(len(bnum)) + " without repetitions")
 
-    def branches(self) -> list[tuple[int, list[tuple[int, str]]]]:
+    def _branches(self) -> [{BranchNum: (QubitNum, str)}]:
+        branches = {}
+        branch = []
+
+        def do_before(parent, child, index, branch, branches):
+
+            if isinstance(child, BranchNum):
+                branches[child] = branch + [(parent, gate_number_to_name[index])]
+            branch.append((parent, gate_number_to_name[index]))
+
+        def do_after(node, branch, **kwargs):
+            if branch:
+                branch.pop(-1)
+
+        for index, child, parent in self.down_generator(self.root,
+                                                        do_after=do_after,
+                                                        do_before=do_before,
+                                                        branch=branch):
+            do_before(parent, child, index, branch, branches)
+        return branches
+
+    # TODO
+    def branches(self) -> [tuple[int, list[tuple[int, str]]]]:
         """
         Convert nodes to list of branches. Used by pauli tables
         """
-        s = []
+        branches = []
+        _branches = self._branches()
+        for branchnode in _branches:
+            branches.append([branchnode.num, [(gate[0].num, gate[1]) for gate in _branches[branchnode]]])
+        return branches
 
-        def down(node, k, branches):
-            for index, child in enumerate(self[node]):
-                if not child.is_last:
-                    down(child, k + [tuple([node.num, gate_number_to_name[index]])], branches)
-                elif isinstance(child, BranchNum):
-                    branches.append((child.num, k + [(node.num, gate_number_to_name[index])]))
-        down(self.root, k=[], branches=s)
-        return s
+    def __str__(self):
+        def to_str(gate):
+            return str(gate[0].num) + gate[1]
 
-
-    def __str__(self, until_enum=False):
-        k = []
-        s = []
-        enum_list = []
         L = self.height()
-
-        def down(parent, k):
-            nonlocal s, enum_list
-            for index, child in enumerate(self[parent].childs):
-                if not child.is_last:
-                    down(child, k + [str(parent) + gate_number_to_name[index]])
-                elif not isinstance(child, LostNum):
-                    if not until_enum:
-                        s.append(k + [str(parent) + gate_number_to_name[index]])
-                        enum_list.append(self.nodes[parent][index])
-                    else:
-                        s.append(k)
-
-        down(self.root, k)
+        s = self._branches()
+        branch_nodes = s.keys()
+        s = s.values()
         pr = ''
         k = 4
-        if not until_enum:
-            for l in range(0, L):
-                for branch in s:
-                    if len(branch) > l:
-                        pr += branch[l] + ' ' * (k - len(branch[l]))
-                    else:
-                        pr += " " * k
-                pr = pr + '\n'
-            for num in enum_list:
-                pr += str(num) + ' ' * (k - len(str(num)))
-
-        else:
-            for l in range(0, L - 1):
-                for branch in s:
-                    if len(branch) > l:
-                        pr += branch[l] + ' ' * (k - len(branch[l]))
-                        pass
-                    else:
-                        pr += " " * k
-                pr = pr + '\n'
+        for l in range(0, L):
+            for branch in s:
+                if len(branch) > l:
+                    pr += to_str(branch[l]) + ' ' * (k - len(branch[l]))
+                else:
+                    pr += " " * k
+            pr = pr + '\n'
+        for num in branch_nodes:
+            pr += str(num.sign * num.num) + ' ' * (k - len(str(num.sign * num.num)))
 
         return pr + '\n ---------------------------------------------------------------'
-
